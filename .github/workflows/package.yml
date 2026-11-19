@@ -1,0 +1,48 @@
+name: Validate and publish one package
+on:
+  workflow_call:
+    inputs:
+      package:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s tests -v
+      - name: Clean Arch build and runtime smoke tests
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: bash scripts/validate.sh "$PACKAGE"
+  publish:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.AUR_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: aur
+    concurrency:
+      group: aur-${{ inputs.package }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: master
+      - name: Reject superseded revisions
+        env:
+          VALIDATED_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$VALIDATED_SHA"
+      - name: Publish reviewed recipe
+        env:
+          PACKAGE: ${{ inputs.package }}
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+          AUR_KNOWN_HOSTS: ${{ vars.AUR_KNOWN_HOSTS }}
+          AUR_GIT_NAME: ${{ vars.AUR_GIT_NAME }}
+          AUR_GIT_EMAIL: ${{ vars.AUR_GIT_EMAIL }}
+        run: bash scripts/publish.sh "$PACKAGE"

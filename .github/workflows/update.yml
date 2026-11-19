@@ -1,0 +1,30 @@
+name: Propose upstream update
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: upstream-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify signed artifacts and refresh recipes
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo archlinux:base-devel bash -euc '
+            pacman -Syu --noconfirm --needed python minisign
+            useradd --uid 1001 --create-home updater
+            chown -R updater:updater /repo
+            runuser -u updater -- python scripts/update.py
+          '
+      - name: Open update pull request
+        env:
+          GH_TOKEN: ${{ secrets.UPDATE_PAT }}
+        run: bash scripts/propose-update.sh

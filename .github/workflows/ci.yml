@@ -1,0 +1,17 @@
+name: Packages
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    uses: ./.github/workflows/package.yml
+    with:
+      package: kraken-cli
+  binary:
+    uses: ./.github/workflows/package.yml
+    with:
+      package: kraken-cli-bin
