@@ -5,6 +5,9 @@ on:
       package:
         required: true
         type: string
+    secrets:
+      AUR_SSH_KEY:
+        required: true
 permissions:
   contents: read
 jobs:

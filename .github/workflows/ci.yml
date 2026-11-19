@@ -11,7 +11,11 @@ jobs:
     uses: ./.github/workflows/package.yml
     with:
       package: kraken-cli
+    secrets:
+      AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
   binary:
     uses: ./.github/workflows/package.yml
     with:
       package: kraken-cli-bin
+    secrets:
+      AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
