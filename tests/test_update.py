@@ -1,8 +1,11 @@
 import importlib.util
+import io
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
@@ -30,6 +33,48 @@ class UpdateTests(unittest.TestCase):
 
     def recipe(self, package="kraken-cli"):
         return self.root / "packages" / package / "PKGBUILD"
+
+    def test_latest_release_authenticates_when_token_is_available(self):
+        def respond(request, timeout):
+            self.assertEqual(
+                request.full_url,
+                "https://api.github.com/repos/krakenfx/kraken-cli/releases/latest",
+            )
+            if request.get_header("Authorization") != "Bearer test-token":
+                raise urllib.error.HTTPError(
+                    request.full_url, 403, "rate limit exceeded", {}, None
+                )
+            return io.BytesIO(b'{"draft": false, "prerelease": false, "tag_name": "v0.5.1"}')
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}, clear=True), patch.object(
+            update.urllib.request, "urlopen", side_effect=respond
+        ):
+            self.assertEqual(update.latest_version(), "0.5.1")
+
+    def test_latest_release_works_without_token_for_local_use(self):
+        def respond(request, timeout):
+            self.assertIsNone(request.get_header("Authorization"))
+            return io.BytesIO(b'{"draft": false, "prerelease": false, "tag_name": "v0.5.1"}')
+
+        with patch.dict(os.environ, {}, clear=True), patch.object(
+            update.urllib.request, "urlopen", side_effect=respond
+        ):
+            self.assertEqual(update.latest_version(), "0.5.1")
+
+    def test_artifact_download_does_not_receive_api_token(self):
+        def respond(request, timeout):
+            self.assertIsNone(request.get_header("Authorization"))
+            return io.BytesIO(b"artifact")
+
+        destination = self.root / "source.tar.gz"
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}, clear=True), patch.object(
+            update.urllib.request, "urlopen", side_effect=respond
+        ):
+            update.download(
+                "https://github.com/krakenfx/kraken-cli/releases/download/v0.5.1/source.tar.gz",
+                destination,
+            )
+        self.assertEqual(destination.read_bytes(), b"artifact")
 
     def test_rejects_unsafe_or_unstable_versions(self):
         for version in ["../main", "1.2.3-rc1", "1.2", "v1.2.3", "1.2.3\nx"]:
