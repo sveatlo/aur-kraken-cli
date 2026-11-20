@@ -17,8 +17,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify signed artifacts and refresh recipes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo archlinux:base-devel bash -euc '
+          docker run --rm --env GITHUB_TOKEN -v "$PWD:/repo" -w /repo archlinux:base-devel bash -euc '
             pacman -Syu --noconfirm --needed python minisign
             useradd --uid 1001 --create-home updater
             chown -R updater:updater /repo

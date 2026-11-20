@@ -40,6 +40,8 @@ def latest_version():
         f"https://api.github.com/repos/{REPOSITORY}/releases/latest",
         headers={"User-Agent": "aur-kraken-cli", "Accept": "application/vnd.github+json"},
     )
+    if token := os.environ.get("GITHUB_TOKEN"):
+        request.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(request, timeout=30) as response:
         release = json.load(response)
     if release["draft"] or release["prerelease"]:
